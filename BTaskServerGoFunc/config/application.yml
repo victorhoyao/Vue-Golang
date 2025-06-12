@@ -1,0 +1,44 @@
+# 系统配置
+server:
+  addr: 0.0.0.0
+  port: 8037
+# 数据库配置
+datasouce_mysql:
+  dirvername: mysql
+  host: localhost
+  port: 3306
+  database: project036
+  admin: root
+  password: 
+# redis配置
+datasouce_redis:
+  host: localhost
+  port: 6379
+  password: 
+  DB: 0 #默认数据库
+# 提现配置
+提现配置:
+  最低提现金额: 100
+# ukey
+Ukey1:
+  AppID: il9dpb9df686IafKVlSB6qkUFp4fCGhn
+  AppSecret: dOZQnnP01_a7GmHzO6mVu11PSxJXGnINS8fyogbC16Il8L5oVD
+# 平台ip
+平台ip:
+  易客1: https://www.xong2.net
+# timer
+Timer:
+  DownOrderTimer: 60 #订单拉取间隔
+  DownBFOrderTimer: 65 #重置播放间隔
+  UpdateTDOrderTimer: 30 #查询退单任务
+  UpOrderTimer: 45 #更新完成的上级订单状态
+  ShengheTimer: 40 #审核更新间隔
+  DelData: "@every 90s" #删除数据定时86400s=24h
+  OrderSchedule: "@every 30s" #更新进度
+  UpdateDoneTimer: 900 #更新主任务完成状态
+# 任务配置
+TaskConfig:
+  TaskTimeOut: 1 #任务提交超时(分)
+  DelTimeOut: 3 #删除2天前的bak
+  BFMaxCount: 10 # 单个账号领取播放的次数
+  CLTimerH: 6 #6小时后清除未提交的记录

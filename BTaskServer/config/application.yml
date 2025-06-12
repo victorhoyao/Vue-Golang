@@ -1,0 +1,28 @@
+# 系统配置
+server:
+  addr: 0.0.0.0
+  port: 8036
+# 数据库配置
+datasouce_mysql:
+  dirvername: mysql
+  host: localhost
+  port: 3306
+  database: project036
+  admin: root
+  password: 
+# redis配置
+datasouce_redis:
+  host: localhost
+  port: 6379
+  password: 
+  DB: 0 #默认数据库
+# 提现配置
+提现配置:
+  最低提现金额: 100
+# 任务配置
+TaskConfig:
+  TaskTimeOut: 3 #任务提交超时(分)
+# 系统设置
+system:
+  maxConcurrentRequests: 200 #限流
+  maxRedisTime: 12 # redis限制12秒
