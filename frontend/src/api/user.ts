@@ -7,6 +7,12 @@ export interface LoginData {
   passWord: string;
 }
 
+export interface RegisterData {
+  userName: string;
+  passWord: string;
+  rootPassWord: string;
+}
+
 export interface LoginRes {
   token: string;
   id: number;
@@ -14,8 +20,21 @@ export interface LoginRes {
   ukey: string;
 }
 
+export interface ChangePassData {
+  oldPass: string;
+  newPass: string;
+}
+
 export function login(data: LoginData) {
   return axios.post<LoginRes>('/login', data);
+}
+
+export function register(data: RegisterData) {
+  return axios.post<LoginRes>('/register', data);
+}
+
+export function changePassword(data: ChangePassData) {
+  return axios.post<any>('/User/changePassword', data);
 }
 
 // export function logout() {

@@ -24,17 +24,26 @@ if (import.meta.env.VITE_API_BASE_URL) {
 
 axios.interceptors.request.use(
   (config: AxiosRequestConfig) => {
+    // eslint-disable-next-line no-console
     console.log('Making request to:', config.url, 'with data:', config.data);
     const token = getToken();
+    // eslint-disable-next-line no-console
+    console.log('Token from storage:', token);
     if (token) {
       if (!config.headers) {
         config.headers = {};
       }
       config.headers.token = `${token}`;
+      // eslint-disable-next-line no-console
+      console.log('Added token to headers:', config.headers.token);
+    } else {
+      // eslint-disable-next-line no-console
+      console.log('No token found in storage');
     }
     return config;
   },
   (error) => {
+    // eslint-disable-next-line no-console
     console.error('Request error:', error);
     return Promise.reject(error);
   }
@@ -42,11 +51,13 @@ axios.interceptors.request.use(
 // add response interceptors
 axios.interceptors.response.use(
   (response: AxiosResponse<HttpResponse>) => {
+    // eslint-disable-next-line no-console
     console.log('Response received:', response.data);
     const res = response.data;
 
     // if the custom code is not 20000, it is judged as an error.
     if (res.code !== 200) {
+      // eslint-disable-next-line no-console
       console.error('Response error:', res);
       Message.error({
         content: res.msg || 'Error',
@@ -58,6 +69,7 @@ axios.interceptors.response.use(
     return res;
   },
   (error) => {
+    // eslint-disable-next-line no-console
     console.error('Response error:', error.response || error);
     Message.error({
       content: error.response?.data?.msg || error.message || 'Request 错误',

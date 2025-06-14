@@ -1,12 +1,12 @@
 package controller
 
 import (
-	"BTaskServer/common"
+	"BTaskServer/global"
 	"BTaskServer/model"
 	"BTaskServer/util/Tools"
 	"BTaskServer/util/response"
 	"BTaskServer/util/validatorTool"
-	"fmt"
+
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
@@ -249,52 +249,34 @@ func GetPriceByType(addUserId uint, priceType int) map[string]interface{} {
 		resMap["msg"] = "该订单类型未设置单价,无法领取,请联系管理员"
 		return resMap
 	}
-
 	resMap["ret"] = true
 	resMap["price"] = price
-	resMap["msg"] = ""
 	return resMap
 }
 
 func cacheManagerList() bool {
-	db := common.GetDB()
-	managerList = []model.Manager{}
-	res := db.Where("1=1").Find(&managerList)
+	res := global.GVA_DB.Find(&managerList)
 	if res.Error != nil {
-		fmt.Println("缓存managerList失败")
 		return false
 	}
 	return true
 }
 
 func getCacelManager(managerId uint) (model.Manager, bool) {
-	var resmanager model.Manager
-	flag := false
-	for _, manager := range managerList {
-		if manager.ManagerId == managerId {
-			resmanager = manager
-			flag = true
-			break
+	for _, v := range managerList {
+		if v.ManagerId == managerId {
+			return v, true
 		}
 	}
-
-	return resmanager, flag
+	return model.Manager{}, false
 }
 
 func getCacelGaiTc() model.Manager {
-	return managerList[0]
+	var manager model.Manager
+	global.GVA_DB.Where("managerId = ?", 1).Limit(1).Find(&manager)
+	return manager
 }
 
 func NewManagerController() IManagerController {
-	db := common.GetDB()
-	if err := db.AutoMigrate(&model.Manager{}); err != nil {
-		panic("manager表迁移失败")
-	}
-	fmt.Println("manager表迁移成功")
-
-	cacheRet := cacheManagerList()
-	if cacheRet == false {
-		panic("缓存managerList失败")
-	}
-	return ManagerController{DB: db}
+	return ManagerController{DB: global.GVA_DB}
 }

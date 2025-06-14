@@ -5,11 +5,12 @@ import (
 	"BTaskServer/util/BLTaskFunc"
 	"BTaskServer/util/Tools"
 	"fmt"
-	"github.com/spf13/viper"
-	"gorm.io/gorm"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/spf13/viper"
+	"gorm.io/gorm"
 )
 
 //易客
@@ -23,7 +24,7 @@ import (
 //7:已退款,
 //8:待处理
 
-var YK1typeList []int = []int{424, 423} //易客1type
+var YK1typeList []int = []int{62, 61} //易客1type
 
 // 易客1拉单
 func GetHigherOrdersYK1(db *gorm.DB) {
@@ -101,9 +102,9 @@ func GetHigherOrdersYK1(db *gorm.DB) {
 			amount, _ := strconv.ParseFloat(amounts, 64)
 
 			var getTaskType int
-			if goods_id == 424 {
+			if goods_id == 62 {
 				getTaskType = 11
-			} else if goods_id == 423 {
+			} else if goods_id == 61 {
 				getTaskType = 12
 			}
 

@@ -34,9 +34,8 @@ type AddUser struct {
 
 // 添加管理员入参
 type AddManager struct {
-	UserName     string `json:"userName" form:"userName" binding:"required,max=20"`
-	PassWord     string `json:"passWord" form:"passWord" binding:"required,max=20"`
-	RootPassWord string `json:"rootPassWord" form:"rootPassWord" binding:"required"`
+	UserName string `json:"userName" form:"userName" binding:"required,max=20"`
+	PassWord string `json:"passWord" form:"passWord" binding:"required,max=20"`
 }
 
 // 修改用户密码入参

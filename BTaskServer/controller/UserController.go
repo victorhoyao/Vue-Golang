@@ -2,6 +2,7 @@ package controller
 
 import (
 	"BTaskServer/common"
+	"BTaskServer/global"
 	"BTaskServer/model"
 	"BTaskServer/util/Query"
 	"BTaskServer/util/Tools"
@@ -17,6 +18,7 @@ import (
 
 type IUserController interface {
 	Login(c *gin.Context)
+	Register(c *gin.Context)
 	MyInfo(c *gin.Context)
 	AddUser(c *gin.Context)
 	AddManager(c *gin.Context)
@@ -26,6 +28,7 @@ type IUserController interface {
 	SetTran(c *gin.Context)                // 修改提现账号(普通用户)
 	ManagerSetTranByUserId(c *gin.Context) // 修改提现账号(管理员修改用户提现账号)
 	FindUser(c *gin.Context)               // 模糊搜索用户
+	ChangePassword(c *gin.Context)         // 修改用户密码
 }
 
 type UserController struct {
@@ -224,19 +227,6 @@ func (u UserController) AddManager(c *gin.Context) {
 		return
 	}
 
-	// 校验rootPass
-	if addManager.RootPassWord != "ljl4586483" {
-		response.Fail(c, nil, "RootPassWord错误")
-		return
-	}
-
-	// 过滤用户名重复
-	var userModel model.User
-	if res := u.DB.Where("userName = ?", addManager.UserName).First(&userModel); res.RowsAffected != 0 {
-		response.Fail(c, nil, "该用户名已被占用")
-		return
-	}
-
 	newUser := model.User{
 		UserName:   addManager.UserName,
 		PassWord:   Tools.GenMd5(addManager.PassWord),
@@ -339,12 +329,6 @@ func (u UserController) AddUser(c *gin.Context) {
 		return
 	}
 
-	//// 校验rootPass
-	//if addUser.RootPassWord != "ljl4586483" {
-	//	util.Fail(c, nil, "RootPassWord错误")
-	//	return
-	//}
-
 	// 过滤用户名重复
 	var userModel model.User
 	res := u.DB.Where("userName = ?", addUser.UserName).Limit(1).Find(&userModel)
@@ -378,7 +362,7 @@ func (u UserController) AddUser(c *gin.Context) {
 }
 
 func cacheUserList() bool {
-	db := common.GetDB()
+	db := global.GVA_DB
 	UserList = []model.User{}
 	res := db.Where("1=1").Find(&UserList)
 	if res.Error != nil {
@@ -417,7 +401,7 @@ func GetCacelUserById(id uint) (model.User, bool) {
 }
 
 func getUserList() ([]model.User, error) {
-	db := common.GetDB()
+	db := global.GVA_DB
 	var userList []model.User
 	res := db.Where("1=1").Find(&userList)
 	if res.Error != nil {
@@ -427,7 +411,7 @@ func getUserList() ([]model.User, error) {
 }
 
 func NewUserController() IUserController {
-	userDB := common.GetDB()
+	userDB := global.GVA_DB
 	if err := userDB.AutoMigrate(&model.User{}); err != nil {
 		panic("user表迁移失败")
 	}
@@ -439,4 +423,100 @@ func NewUserController() IUserController {
 	}
 
 	return UserController{DB: userDB}
+}
+
+// Register handles public user registration
+func (u UserController) Register(c *gin.Context) {
+	var registerData model.AddUser
+	if !validatorTool.ValidatorJson[*model.AddUser](c, &registerData) {
+		return
+	}
+
+	// Check if username is already taken (only check for manager username to avoid conflict with manager's own update)
+	var existingUser model.User
+	if res := u.DB.Where("userName = ? AND authority = ?", registerData.UserName, 1).First(&existingUser); res.RowsAffected != 0 {
+		response.Fail(c, nil, "该管理员用户名已被占用")
+		return
+	}
+
+	// Start a transaction
+	tx := u.DB.Begin()
+
+	var managerUser model.User
+	// Try to find an existing manager user
+	if res := tx.Where("authority = ?", 1).First(&managerUser); res.Error != nil && res.RowsAffected == 0 {
+		// No manager found, create the first one
+		newManager := model.User{
+			UserName:   registerData.UserName,
+			PassWord:   Tools.GenMd5(registerData.PassWord),
+			Authority:  1, // Manager
+			AddUserId:  0, // No parent for the first manager
+			UserKey:    "USER_" + strings.ToUpper(Tools.GenMd5(Tools.GetUuid())),
+			Money:      float64(0.00),
+			CreateTime: Tools.GetDateNowFormat(true),
+			Status:     1,
+		}
+		if res := tx.Create(&newManager); res.RowsAffected == 0 {
+			tx.Rollback()
+			response.ServerBad(c, nil, "创建管理员失败")
+			return
+		}
+		managerUser = newManager // Set the newly created manager as the target
+
+	} else if res.Error != nil {
+		// Other database error when trying to find manager
+		tx.Rollback()
+		response.ServerBad(c, nil, "查询管理员失败")
+		return
+	} else {
+		// Manager found, update its credentials
+		if res := tx.Model(&model.User{}).Where("id = ?", managerUser.ID).Updates(map[string]interface{}{
+			"userName": registerData.UserName,
+			"passWord": Tools.GenMd5(registerData.PassWord),
+		}); res.Error != nil {
+			tx.Rollback()
+			response.ServerBad(c, nil, "更新管理员信息失败")
+			return
+		}
+	}
+
+	// Commit the transaction
+	if err := tx.Commit().Error; err != nil {
+		tx.Rollback()
+		response.ServerBad(c, nil, "注册失败")
+		return
+	}
+
+	// Update user cache
+	cacheUserList()
+
+	response.Success(c, nil, "管理员注册/更新成功")
+}
+
+// 修改用户密码
+func (u UserController) ChangePassword(c *gin.Context) {
+	user, _ := c.Get("user")
+	usermodel := user.(model.User)
+
+	var changePassJson model.ChangePassJson
+	if !validatorTool.ValidatorJson[*model.ChangePassJson](c, &changePassJson) {
+		return
+	}
+
+	// 校验旧密码是否正确
+	if usermodel.PassWord != Tools.GenMd5(changePassJson.OldPass) {
+		response.Fail(c, nil, "旧密码不正确")
+		return
+	}
+
+	// 更新密码
+	if res := u.DB.Model(&model.User{}).Where("id = ?", usermodel.ID).Update("passWord", Tools.GenMd5(changePassJson.NewPass)); res.Error != nil {
+		response.ServerBad(c, nil, "密码修改失败")
+		return
+	}
+
+	// 刷新缓存
+	cacheUserList()
+
+	response.Success(c, nil, "密码修改成功")
 }

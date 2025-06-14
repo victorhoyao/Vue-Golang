@@ -2,9 +2,10 @@ package middleware
 
 import (
 	"BTaskServer/common"
-	"BTaskServer/controller"
+	"BTaskServer/global"
 	"BTaskServer/model"
 	"BTaskServer/util/response"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -30,18 +31,10 @@ func AuthMiddleware() gin.HandlerFunc {
 		}
 
 		// 获得userID,通过userid查询用户是否存在
-		//var UserModel model.User
-		//db := common.GetDB()
-		//userid := claims.UserId
-		//if res := db.Where("id = ?", userid).First(&UserModel); res.RowsAffected == 0 {
-		//	response.AuthError(c, nil, "用户未登录")
-		//	c.Abort()
-		//	return
-		//}
-
+		var UserModel model.User
+		db := global.GVA_DB
 		userid := claims.UserId
-		UserModel, b := controller.GetCacelUserById(userid)
-		if b == false {
+		if res := db.Where("id = ?", userid).First(&UserModel); res.RowsAffected == 0 {
 			response.AuthError(c, nil, "用户未登录")
 			c.Abort()
 			return
@@ -69,7 +62,7 @@ func AuthWebsocketMiddleware(tokenString string) (bool, uint) {
 
 	// 获得userID,通过userid查询用户是否存在
 	var UserModel model.User
-	db := common.GetDB()
+	db := global.GVA_DB
 	userid := claims.UserId
 	if res := db.Where("id = ?", userid).First(&UserModel); res.RowsAffected == 0 {
 		return false, 0

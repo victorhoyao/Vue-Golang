@@ -3,9 +3,11 @@ package validatorTool
 import (
 	"BTaskServer/common"
 	"BTaskServer/util/response"
+	"strconv"
+	"strings"
+
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
-	"strconv"
 )
 
 // 参数校验 json
@@ -17,9 +19,19 @@ func ValidatorJson[M any](c *gin.Context, paramsModel M) bool {
 			response.RequsetBad(c, nil, errs.Error())
 			return false
 		}
+
 		// validatorTool.ValidationErrors类型错误则进行翻译
 		// 并使用removeTopStruct函数去除字段名中的结构体名称标识
-		response.Fail(c, nil, common.RemoveTopStruct(errs.Translate(common.Trans)))
+		translatedErrors := common.RemoveTopStruct(errs.Translate(common.Trans))
+
+		// Join all error messages into a single string
+		var errorMessages []string
+		for _, msg := range translatedErrors {
+			errorMessages = append(errorMessages, msg)
+		}
+		finalErrorMessage := strings.Join(errorMessages, ", ")
+
+		response.Fail(c, nil, finalErrorMessage)
 		return false
 	}
 	//校验成功
@@ -37,7 +49,13 @@ func ValidatorForm[M any](c *gin.Context, paramsModel M) bool {
 		}
 		// validatorTool.ValidationErrors类型错误则进行翻译
 		// 并使用removeTopStruct函数去除字段名中的结构体名称标识
-		response.Fail(c, nil, common.RemoveTopStruct(errs.Translate(common.Trans)))
+		translatedErrors := common.RemoveTopStruct(errs.Translate(common.Trans))
+		var errorMessages []string
+		for _, msg := range translatedErrors {
+			errorMessages = append(errorMessages, msg)
+		}
+		finalErrorMessage := strings.Join(errorMessages, ", ")
+		response.Fail(c, nil, finalErrorMessage)
 		return false
 	}
 	//校验成功
@@ -55,7 +73,13 @@ func ValidatorQuery[M any](c *gin.Context, paramsModel M) bool {
 		}
 		// validatorTool.ValidationErrors类型错误则进行翻译
 		// 并使用removeTopStruct函数去除字段名中的结构体名称标识
-		response.Fail(c, nil, common.RemoveTopStruct(errs.Translate(common.Trans)))
+		translatedErrors := common.RemoveTopStruct(errs.Translate(common.Trans))
+		var errorMessages []string
+		for _, msg := range translatedErrors {
+			errorMessages = append(errorMessages, msg)
+		}
+		finalErrorMessage := strings.Join(errorMessages, ", ")
+		response.Fail(c, nil, finalErrorMessage)
 		return false
 	}
 	//校验成功

@@ -1,15 +1,16 @@
 package controller
 
 import (
-	"BTaskServer/common"
+	"BTaskServer/global"
 	"BTaskServer/model"
 	"BTaskServer/util/Query"
 	"BTaskServer/util/response"
 	"BTaskServer/util/validatorTool"
 	"fmt"
+	"strconv"
+
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
-	"strconv"
 )
 
 type ITaskLogController interface {
@@ -206,7 +207,7 @@ func (t TaskLogController) GetTaskLogList(c *gin.Context) {
 }
 
 func NewTaskLogController() ITaskLogController {
-	db := common.GetDB()
+	db := global.GVA_DB
 	if err := db.AutoMigrate(&model.TaskLog{}); err != nil {
 		panic("taskLog表迁移失败")
 	}

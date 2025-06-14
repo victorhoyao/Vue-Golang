@@ -34,9 +34,8 @@ type AddUser struct {
 
 // 添加管理员入参
 type AddManager struct {
-	UserName     string `json:"userName" form:"userName" binding:"required,max=20"`
-	PassWord     string `json:"passWord" form:"passWord" binding:"required,max=20"`
-	RootPassWord string `json:"rootPassWord" form:"rootPassWord" binding:"required"`
+	UserName string `json:"userName" form:"userName" binding:"required,max=20"`
+	PassWord string `json:"passWord" form:"passWord" binding:"required,max=20"`
 }
 
 // 修改用户密码入参
@@ -48,6 +47,12 @@ type EditUserPass struct {
 // 删除用户入参
 type DelUser struct {
 	UserId uint `json:"userId" form:"userId" binding:"required"`
+}
+
+// 修改密码入参
+type ChangePassJson struct {
+	OldPass string `json:"oldPass" form:"oldPass" binding:"required,max=20"`
+	NewPass string `json:"newPass" form:"newPass" binding:"required,max=20"`
 }
 
 // 设置提现账号入参

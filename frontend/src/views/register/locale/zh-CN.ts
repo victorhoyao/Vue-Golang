@@ -6,6 +6,7 @@ export default {
     'register.form.email.invalidErrMsg': '邮箱格式无效',
     'register.form.password.placeholder': '请输入密码',
     'register.form.password.errMsg': '密码不能为空',
+    'register.form.rememberPassword': '记住密码',
     'register.form.register': '注册',
     'register.form.register.success': '注册成功！',
     'register.form.register.error': '注册失败，请重试。',
@@ -15,5 +16,6 @@ export default {
     'register.banner.subSlogan2': '您的数据对我们来说是安全的',
     'register.banner.slogan3': '今天就开始您的旅程！',
     'register.banner.subSlogan3': '注册并在几分钟内开始',
+    'register.form.backToLogin': '返回登录',
   };
   

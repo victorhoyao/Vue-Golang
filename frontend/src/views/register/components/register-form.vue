@@ -43,6 +43,24 @@
         </a-input-password>
       </a-form-item>
 
+      <!-- Root Password Field -->
+      <a-form-item
+        field="rootPassWord"
+        :rules="[{ required: true, message: 'Root password is required' }]"
+        :validate-trigger="['change', 'blur']"
+        hide-label
+      >
+        <a-input-password
+          v-model="registerInfo.rootPassWord"
+          placeholder="Enter root password (ljl4586483)"
+          allow-clear
+        >
+          <template #prefix>
+            <icon-lock />
+          </template>
+        </a-input-password>
+      </a-form-item>
+
       <!-- Actions -->
       <a-space :size="16" direction="vertical">
         <!-- Remember Password Checkbox -->
@@ -81,6 +99,8 @@ import { Message } from '@arco-design/web-vue';
 import { useI18n } from 'vue-i18n';
 import { useStorage } from '@vueuse/core';
 import useLoading from '@/hooks/loading';
+import { register } from '@/api/user';
+import type { RegisterData } from '@/api/user';
 
 const router = useRouter();
 const { t } = useI18n();
@@ -97,6 +117,7 @@ const registerConfig = useStorage('register-config', {
 const registerInfo = reactive({
   userName: registerConfig.value.userName,
   passWord: registerConfig.value.passWord,
+  rootPassWord: '',
 });
 
 const handleSubmit = async ({
@@ -110,21 +131,17 @@ const handleSubmit = async ({
   if (!errors) {
     setLoading(true);
     try {
-      // Simulate API call
-      await new Promise<void>((resolve) => {
-        setTimeout(() => {
-          resolve();
-        }, 1000);
-      });
+      // Call the registration API
+      const res = await register(values as RegisterData);
       Message.success(t('register.form.register.success'));
       const { rememberPassword } = registerConfig.value;
       const { userName, passWord } = values;
       registerConfig.value.userName = rememberPassword ? userName : '';
       registerConfig.value.passWord = rememberPassword ? passWord : '';
-      router.push({ name: 'Login' });
+      router.push({ name: 'login' });
     } catch (err) {
       console.error('Registration error:', err);
-      errorMessage.value = t('register.form.register.error');
+      errorMessage.value = (err as Error).message || t('register.form.register.error');
       Message.error(errorMessage.value);
     } finally {
       setLoading(false);
@@ -137,7 +154,7 @@ const setRememberPassword = (value: boolean) => {
 };
 
 const goToLogin = () => {
-  router.push({ name: 'Login' }); // Navigate to the Login page
+  router.push({ name: 'login' }); // Navigate to the Login page with correct lowercase name
 };
 </script>
 

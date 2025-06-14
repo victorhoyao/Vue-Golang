@@ -42,8 +42,6 @@
             </div>
 
           </a-tab-pane>
-
-
           <a-tab-pane key="3" title="提现记录">
             <a-row>
               <a-col :span="24">
@@ -58,6 +56,9 @@
                   </template></a-table>
               </a-col>
             </a-row>
+          </a-tab-pane>
+          <a-tab-pane key="2" title="设置">
+            <ChangePassword />
           </a-tab-pane>
         </a-tabs>
       </a-col>
@@ -75,6 +76,7 @@ import { getUserInfo } from '@/api/user';
 import { useUserStore } from '@/store';
 import { Message } from '@arco-design/web-vue';
 import { ref, onMounted } from 'vue';
+import ChangePassword from './components/change-password.vue';
 
 const UserInfo = ref({
   money: 0,

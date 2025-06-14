@@ -2,6 +2,7 @@ package controller
 
 import (
 	"BTaskServer/common"
+	"BTaskServer/global"
 	"BTaskServer/model"
 	"BTaskServer/util/Query"
 	"BTaskServer/util/Tools"
@@ -9,13 +10,14 @@ import (
 	"BTaskServer/util/validatorTool"
 	"context"
 	"fmt"
+	"sync"
+	"sync/atomic"
+	"time"
+
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
 	"github.com/spf13/viper"
 	"gorm.io/gorm"
-	"sync"
-	"sync/atomic"
-	"time"
 )
 
 var (
@@ -248,121 +250,42 @@ func (t TaskListController) GetTask(c *gin.Context) {
 	newAllocated, err := t.RDS.Incr(ctx, allocatedKey).Result()
 	if err != nil {
 		tx.Rollback()
-		response.ServerBad(c, nil, "领取失败，Redis计数失败")
-		return
-	}
-	t.RDS.Expire(ctx, allocatedKey, 2*time.Hour)
-
-	// 最终确认分配数量不超过限制
-	if newAllocated > int64(taskList.BuyNumber) {
-		// 如果超过了限制，回滚Redis计数
-		t.RDS.Decr(ctx, allocatedKey)
-		tx.Rollback()
-		response.Fail(c, nil, "任务已被全部领取")
+		response.ServerBad(c, nil, "领取失败，Redis计数更新失败")
 		return
 	}
 
-	// 设置账号任务关联
-	accountTaskKey := fmt.Sprintf("account:%s:order:%d", getTaskQuery.BlAccount, taskList.OrderId)
-	err = t.RDS.SetNX(ctx, accountTaskKey, 1, 6*time.Hour).Err()
-	if err != nil {
-		// 回滚Redis计数
-		t.RDS.Decr(ctx, allocatedKey)
+	// 如果计数超过了购买数量，回滚
+	if int(newAllocated) > taskList.BuyNumber {
 		tx.Rollback()
-		response.ServerBad(c, nil, "领取失败，Redis操作失败")
+		rollbackRedisAllocation(t.RDS, allocatedKey, accountTypeKey)
+		response.Fail(c, nil, "领取失败，任务已被领完")
+		return
+	}
+
+	// 更新数据库中的已领取数量
+	if err := tx.Model(&model.TaskList{}).Where("id = ?", taskList.ID).Update("collectNum", gorm.Expr("collectNum + ?", 1)).Error; err != nil {
+		tx.Rollback()
+		rollbackRedisAllocation(t.RDS, allocatedKey, accountTypeKey)
+		response.ServerBad(c, nil, "领取失败，更新任务数量失败")
 		return
 	}
 
 	// 创建任务日志
 	newTaskLog := model.TaskLog{
-		CollectTime: Tools.GetDateNowFormat(true),
-		OrderNum:    Tools.GetUuid(),
-		Account:     getTaskQuery.BlAccount,
-		VideoLink:   taskList.VideoLink,
 		OrderId:     taskList.OrderId,
-		GoodsId:     taskList.GoodsId,
-		GoodsName:   taskList.GoodsName,
+		ID:          taskList.ID,
+		Account:     getTaskQuery.BlAccount,
+		UserKey:     getTaskQuery.UserKey,
+		VideoLink:   taskList.VideoId,
+		CollectTime: Tools.GetDateNowFormat(true),
+		SumbmitTime: "", // 初始为空
+		Status:      0,  // 0已领取待提交，1已提交，2已超时，3审核通过 4审核不通过
+		GetTaskType: getTaskQuery.Type,
 		Price:       price,
-		UserKey:     user.UserKey,
-		ManagerId:   user.AddUserId,
-		Status:      0,
-		GetTaskType: taskList.GetTaskType,
-		PingtaiName: taskList.PingtaiName,
 	}
-
-	// 执行最终安全检查，确保数据库中的领取数量不会超过限制
-	// 这是一个关键的双重保险机制，确保在高并发情况下仍能防止任务超领
-	var totalTaskCount int64
-	if err := tx.Model(&model.TaskList{}).
-		Where("orderId = ?", taskList.OrderId).
-		Select("collectNum").
-		Pluck("collectNum", &totalTaskCount).Error; err != nil {
-		// 查询失败，回滚Redis计数
-		t.RDS.Decr(ctx, allocatedKey)
-		t.RDS.Del(ctx, accountTaskKey)
-		t.RDS.Del(ctx, accountTypeKey)
-		tx.Rollback()
-		response.ServerBad(c, nil, "领取失败，无法获取任务总计数")
-		return
-	}
-
-	// 如果当前数据库中的计数+1已经超过限制，则不允许领取
-	// 这是防止任务超领的最后一道防线，直接基于数据库当前状态判断，避免Redis计数不准确的问题
-	if totalTaskCount+1 > int64(taskList.BuyNumber) {
-		// 回滚Redis计数
-		t.RDS.Decr(ctx, allocatedKey)
-		t.RDS.Del(ctx, accountTaskKey)
-		t.RDS.Del(ctx, accountTypeKey)
-		tx.Rollback()
-		response.Fail(c, nil, "任务领取数量已达上限")
-		return
-	}
-
-	// 更新数据库任务领取数量
-	if err := tx.Model(&model.TaskList{}).Where("id = ? AND collectNum < buyNumber", taskList.ID).
-		Updates(map[string]interface{}{
-			"collectNum":  gorm.Expr("collectNum + 1"),
-			"lastGetTime": Tools.GetDateNowFormat(true),
-		}).Error; err != nil {
-		// 回滚所有Redis设置
-		t.RDS.Del(ctx, accountTaskKey)
-		t.RDS.Del(ctx, accountTypeKey)
-		t.RDS.Decr(ctx, allocatedKey)
-		tx.Rollback()
-		response.ServerBad(c, nil, "领取失败，更新任务数据失败")
-		return
-	}
-
-	// 验证更新结果
-	var updatedTask model.TaskList
-	if err := tx.Where("id = ?", taskList.ID).First(&updatedTask).Error; err != nil {
-		// 回滚所有Redis设置
-		t.RDS.Del(ctx, accountTaskKey)
-		t.RDS.Del(ctx, accountTypeKey)
-		t.RDS.Decr(ctx, allocatedKey)
-		tx.Rollback()
-		response.ServerBad(c, nil, "领取失败，验证任务数据失败")
-		return
-	}
-
-	// 再次严格检查数据库中的数量是否超限
-	if updatedTask.CollectNum > updatedTask.BuyNumber {
-		// 回滚所有Redis设置
-		t.RDS.Del(ctx, accountTaskKey)
-		t.RDS.Del(ctx, accountTypeKey)
-		t.RDS.Decr(ctx, allocatedKey)
-		tx.Rollback()
-		response.Fail(c, nil, "任务领取数量已达上限")
-		return
-	}
-
-	// 创建任务日志
 	if err := tx.Create(&newTaskLog).Error; err != nil {
-		// 回滚所有Redis设置
-		t.RDS.Del(ctx, accountTaskKey)
-		t.RDS.Del(ctx, accountTypeKey)
-		t.RDS.Decr(ctx, allocatedKey)
 		tx.Rollback()
+		rollbackRedisAllocation(t.RDS, allocatedKey, accountTypeKey)
 		response.ServerBad(c, nil, "领取失败，创建任务日志失败")
 		return
 	}
@@ -370,7 +293,6 @@ func (t TaskListController) GetTask(c *gin.Context) {
 	// 提交事务
 	if err := tx.Commit().Error; err != nil {
 		// 回滚所有Redis设置
-		t.RDS.Del(ctx, accountTaskKey)
 		t.RDS.Del(ctx, accountTypeKey)
 		t.RDS.Decr(ctx, allocatedKey)
 		tx.Rollback()
@@ -487,7 +409,7 @@ func updateTaskLogSuccess(db *gorm.DB, taskLogId uint) error {
 
 // 4. 修改NewTaskListController构造函数，增加并发支持
 func NewTaskListController() ITaskListController {
-	db := common.GetDB()
+	db := global.GVA_DB
 	rds := common.GetRedis()
 
 	if err := db.AutoMigrate(&model.TaskList{}); err != nil {

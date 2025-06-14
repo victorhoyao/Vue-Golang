@@ -12,6 +12,7 @@ func CollectRoute(r *gin.Engine) *gin.Engine {
 
 	UserController := controller.NewUserController()
 	r.POST("login", UserController.Login)
+	r.POST("register", UserController.Register)
 	r.POST("addManager", UserController.AddManager)
 	ConfigController := controller.NewConfigController()
 	r.GET("getApplicationConfig", ConfigController.GetApplicationConfig)
@@ -27,6 +28,7 @@ func CollectRoute(r *gin.Engine) *gin.Engine {
 	User.POST("setTran", UserController.SetTran)
 	User.POST("setTranByUser/:id", UserController.ManagerSetTranByUserId) // 管理员
 	User.GET("findUser", UserController.FindUser)
+	User.POST("changePassword", UserController.ChangePassword) // 修改用户密码
 
 	TransactionController := controller.NewTransactionLogController()
 	Tran := r.Group("Tran")
@@ -59,6 +61,37 @@ func CollectRoute(r *gin.Engine) *gin.Engine {
 	taskLog.GET("getMyTaskLogList", taskLogController.GetMyTaskLogList)
 	taskLog.GET("getTaskLogListById/:id", taskLogController.GetTaskLogListById)
 	taskLog.GET("getTaskLogCount", taskLogController.GetTaskLogCount)
+
+	// Supplier Management routes
+	SupplierController := controller.NewSupplierController()
+	Supplier := r.Group("Supplier")
+	Supplier.Use(middleware.AuthMiddleware())
+	Supplier.POST("add", SupplierController.AddSupplier)
+	Supplier.GET("list", SupplierController.GetSuppliers)
+	Supplier.PUT("update/:id", SupplierController.UpdateSupplier)
+	Supplier.DELETE("delete/:id", SupplierController.DeleteSupplier)
+
+	// Task Item Management routes
+	TaskItemController := controller.NewTaskItemController()
+	TaskItem := r.Group("TaskItem")
+	TaskItem.Use(middleware.AuthMiddleware())
+	TaskItem.POST("add", TaskItemController.CreateTaskItem)
+	TaskItem.GET("list", TaskItemController.GetTaskItems)
+	TaskItem.PUT("update/:id", TaskItemController.UpdateTaskItem)
+	TaskItem.DELETE("delete/:id", TaskItemController.DeleteTaskItem)
+
+	// Task Distribution Management routes
+	TaskDistributionController := controller.NewTaskDistributionController()
+	TaskDistribution := r.Group("TaskDistribution")
+	TaskDistribution.Use(middleware.AuthMiddleware())
+	TaskDistribution.POST("create", TaskDistributionController.CreateTaskDistribution)
+	TaskDistribution.GET("list", TaskDistributionController.GetTaskDistributions)
+	TaskDistribution.GET("get/:id", TaskDistributionController.GetTaskDistribution)
+	TaskDistribution.PUT("update/:id", TaskDistributionController.UpdateTaskDistribution)
+	TaskDistribution.DELETE("delete/:id", TaskDistributionController.DeleteTaskDistribution)
+	TaskDistribution.POST("activate/:id", TaskDistributionController.ActivateTaskDistribution)
+	TaskDistribution.GET("by-task-item/:taskItemId", TaskDistributionController.GetTaskDistributionsByTaskItem)
+	TaskDistribution.GET("summary", TaskDistributionController.GetDistributionSummary)
 
 	return r
 }
